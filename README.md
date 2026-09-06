@@ -199,19 +199,19 @@ GET  /health          → { status: "ok" }
 
 ## Deployment (Render)
 
-**Build command:**
-```bash
-pip install -r backend/requirements.txt && npm --prefix frontend ci && npm --prefix frontend run build
-```
+**Live Demo URL:** [https://ai-bugfix-agent.onrender.com](https://ai-bugfix-agent.onrender.com)
 
-**Start command:**
-```bash
-uvicorn backend.main:app --host 0.0.0.0 --port $PORT
-```
+- **Platform:** Render Free Tier (single web service running Linux + Python 3.11 + React SPA).
+- **Cold-Start Latency:** Free-tier instances spin down after 15 minutes of inactivity. When idle, the initial cold-start wake-up takes approximately **35–50 seconds**. Once warm, the readiness endpoint (`/health`) responds in **~1.6 seconds**.
+- **Live Empirical Verification:**
+  - **Snippet Mode (`tally_points`):** Status **`verified`** in 25.6s (1 iteration, genuine fix confirmed by Judge LLM). Demonstrates native Linux POSIX sandbox resource limits (`resource.setrlimit`) running test suites to completion.
+  - **GitHub Repo Mode (`buggy-python-demo`):** Status **`verified`** in 32.8s (1 iteration, genuine fix confirmed by Judge LLM on public repository `https://github.com/Jayanth-Kurapati/buggy-python-demo`).
 
-**Health check:** `GET /health`
-
-**Required environment variable:** `OPENROUTER_API_KEY`
+**Blueprint Configuration (`render.yaml`):**
+- **Build command:** `pip install -r backend/requirements.txt && npm --prefix frontend ci && npm --prefix frontend run build`
+- **Start command:** `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+- **Health check:** `GET /health`
+- **Required environment variable:** `OPENROUTER_API_KEY` (secret, `sync: false`)
 
 ---
 

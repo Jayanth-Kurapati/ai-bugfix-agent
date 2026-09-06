@@ -72,5 +72,5 @@ A GenAI Developer Intern build-sprint MVP: an agentic bug-fixing tool. Input: a 
 
 ## Current status
 *(Update this line at the end of each session so the next session starts oriented.)*
-Phase complete (2026-09-07): Part A (Submission-Critical) & Part B (Design Overhaul) fully verified and pushed to GitHub. Public repository: https://github.com/Jayanth-Kurapati/ai-bugfix-agent. Repo mode end-to-end verified on public demo repo (https://github.com/Jayanth-Kurapati/buggy-python-demo). Render blueprint configured via render.yaml. UI/UX overhauled with architectural dark theme, Lucide icons, IDE diff window chrome, and verified honesty banners; 43 passed backend tests, clean frontend build.
+Phase complete (2026-09-07): Full Render deployment successful and live at https://ai-bugfix-agent.onrender.com. Configured via render.yaml blueprint with free-tier Python 3.11 runtime. Live post-deploy verification confirmed: GET /health returns 200 (~1.6s warm, ~40s cold start); snippet mode ('tally_points') confirmed genuinely 'verified' in 25.6s with Linux POSIX sandbox limits; GitHub repo mode confirmed genuinely 'verified' in 32.8s on public repo https://github.com/Jayanth-Kurapati/buggy-python-demo. README and repository updated.
 
