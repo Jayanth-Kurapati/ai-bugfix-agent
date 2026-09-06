@@ -1,21 +1,23 @@
-/* InputForm styles - Modern architectural design */
+/* InputForm styles - Developer Workstation Layout */
 
 .input-form {
-  padding: 24px 28px;
+  padding: 28px 32px;
   width: 100%;
 }
 
 .form-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 16px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .form-title-group {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .form-icon-wrapper {
@@ -25,32 +27,91 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-sm);
-  background: var(--surface-secondary);
+  background: var(--bg-surface-elevated);
   border: 1px solid var(--border-subtle);
   color: var(--accent-primary);
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .form-title {
   font-size: 16px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   color: var(--text-primary);
+}
+
+.form-subtitle {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.form-actions-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .try-example-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 12px;
   padding: 6px 12px;
+  white-space: nowrap;
 }
 
-/* Mode switcher */
+/* Inline Error Banner */
+.form-error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+  color: var(--color-error);
+}
+
+.error-banner-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.error-banner-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.error-banner-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f87171;
+}
+
+.error-banner-text {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.error-dismiss-btn {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+}
+
+/* Accessible Mode Switcher Tabs */
 .mode-switcher {
   display: flex;
   gap: 4px;
   padding: 3px;
-  background: var(--surface-inset);
+  background: var(--bg-surface-inset);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   margin-bottom: 22px;
@@ -80,10 +141,15 @@
 }
 
 .mode-tab.active {
-  background: var(--surface-card);
-  border-color: var(--border-subtle);
+  background: var(--bg-surface);
+  border-color: var(--border-medium);
   color: var(--text-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-sm);
+}
+
+.mode-tab:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -1px;
 }
 
 /* Fields */
@@ -112,8 +178,8 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-muted);
-  background: var(--surface-inset);
-  padding: 2px 6px;
+  background: var(--bg-surface-elevated);
+  padding: 2px 7px;
   border-radius: 4px;
   border: 1px solid var(--border-subtle);
 }
@@ -122,14 +188,14 @@
   font-family: var(--font-code);
   font-size: 12.5px;
   line-height: 1.6;
-  background: var(--surface-inset);
+  background: var(--bg-surface-inset);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 12px 14px;
 }
 
 .code-textarea:focus {
-  background: #0d0f14;
+  background: #090a0f;
   border-color: var(--accent-primary);
 }
 
@@ -157,10 +223,18 @@
 }
 
 .btn-spinner {
-  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@media (max-width: 640px) {
+  .input-form {
+    padding: 20px 18px;
+  }
+  .form-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .try-example-btn {
+    align-self: flex-start;
+  }
 }

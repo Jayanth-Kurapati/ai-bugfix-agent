@@ -8,25 +8,27 @@ import {
   Terminal,
   Scale,
   Flag,
-  Clock,
-  ScrollText,
+  Sparkles,
+  ShieldCheck,
   AlertCircle,
+  FileCode,
 } from 'lucide-react';
 import './TraceView.css';
 
 /**
- * Maps trace event kind → display configuration with Lucide icons.
+ * Maps trace event kind → metadata configuration.
  */
 const EVENT_CONFIG = {
-  LINT:          { icon: Search,           label: 'Lint Analysis', color: 'var(--color-info)' },
-  KNOWN:         { icon: CheckCircle2,     label: 'Known Facts',   color: 'var(--color-success)' },
-  UNKNOWN:       { icon: HelpCircle,       label: 'Unknowns',      color: 'var(--color-warning)' },
-  HYPOTHESIS:    { icon: Lightbulb,        label: 'Hypothesis',    color: 'var(--accent-primary)' },
-  'NEXT ACTION': { icon: ArrowRightCircle, label: 'Next Action',   color: '#38bdf8' },
-  PATCH:         { icon: GitCommit,        label: 'Patch',         color: '#a855f7' },
-  VERIFY:        { icon: Terminal,         label: 'Verification',  color: 'var(--color-info)' },
-  JUDGE:         { icon: Scale,            label: 'Judge Verdict', color: 'var(--color-warning)' },
-  FINAL:         { icon: Flag,             label: 'Final Status',  color: 'var(--text-primary)' },
+  MODELS:        { icon: ShieldCheck,      label: 'Model Selection', color: 'var(--color-info)' },
+  LINT:          { icon: Search,           label: 'Lint Analysis',   color: 'var(--color-info)' },
+  KNOWN:         { icon: CheckCircle2,     label: 'Known Facts',     color: 'var(--color-success)' },
+  UNKNOWN:       { icon: HelpCircle,       label: 'Unknowns',        color: 'var(--color-warning)' },
+  HYPOTHESIS:    { icon: Lightbulb,        label: 'Root Cause',      color: 'var(--accent-primary)' },
+  'NEXT ACTION': { icon: ArrowRightCircle, label: 'Action Plan',     color: 'var(--accent-primary)' },
+  PATCH:         { icon: GitCommit,        label: 'Patch Diff',      color: '#a855f7' },
+  VERIFY:        { icon: Terminal,         label: 'Verification',    color: 'var(--color-info)' },
+  JUDGE:         { icon: Scale,            label: 'Judge Verdict',   color: 'var(--color-warning)' },
+  FINAL:         { icon: Flag,             label: 'Final Verdict',   color: 'var(--text-primary)' },
 };
 
 function renderEventContent(event) {
@@ -50,8 +52,12 @@ function renderEventContent(event) {
 
     case 'HYPOTHESIS':
       return (
-        <div className="event-content hypothesis-highlight">
-          <p className="event-message event-hypothesis">{message}</p>
+        <div className="event-content hypothesis-card">
+          <div className="hypothesis-header">
+            <Lightbulb size={14} className="hypothesis-icon" />
+            <span className="hypothesis-title">Identified Root Cause</span>
+          </div>
+          <p className="event-hypothesis-text">{message}</p>
         </div>
       );
 
@@ -134,7 +140,7 @@ function renderEventContent(event) {
               {data.genuine_fix ? (
                 <>
                   <CheckCircle2 size={13} />
-                  <span>Genuine Fix Verified</span>
+                  <span>Genuine Fix Confirmed</span>
                 </>
               ) : (
                 <>
@@ -162,7 +168,7 @@ function renderEventContent(event) {
       return (
         <div className="event-content">
           <p className="event-message">{message}</p>
-          {Object.keys(data).length > 0 && (
+          {Object.keys(data || {}).length > 0 && (
             <pre className="event-raw">{JSON.stringify(data, null, 2)}</pre>
           )}
         </div>
@@ -170,47 +176,65 @@ function renderEventContent(event) {
   }
 }
 
-export default function TraceView({ events }) {
+export default function TraceView({ events, onTryExample }) {
+  // Empty state: Agent workspace ready with call to action
   if (!events || events.length === 0) {
     return (
-      <div className="trace-view glass-card animate-fade-in" id="trace-view">
+      <div className="trace-view surface-card animate-fade-in" id="trace-view">
         <div className="trace-empty">
-          <div className="trace-empty-icon animate-pulse">
-            <Clock size={28} />
+          <div className="trace-empty-icon" aria-hidden="true">
+            <FileCode size={32} />
           </div>
-          <p>Waiting for trace events…</p>
+          <h3 className="trace-empty-title">Agent Workspace Ready</h3>
+          <p className="trace-empty-desc">
+            Submit a Python snippet or GitHub repository to begin diagnosis, patch generation, and sandboxed verification.
+          </p>
+          {onTryExample && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm empty-action-btn"
+              onClick={onTryExample}
+            >
+              <Sparkles size={13} />
+              <span>Try Python Example</span>
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="trace-view glass-card" id="trace-view">
+    <div className="trace-view surface-card" id="trace-view">
       <div className="trace-header">
         <div className="trace-title-group">
-          <ScrollText size={18} className="trace-header-icon" />
           <h3 className="trace-title">Reasoning Trace</h3>
+          <span className="event-count">{events.length} events</span>
         </div>
-        <span className="event-count">{events.length} events</span>
       </div>
 
       <div className="trace-timeline">
         {events.map((event, index) => {
-          const config = EVENT_CONFIG[event.kind] || { icon: ArrowRightCircle, label: event.kind, color: 'var(--text-secondary)' };
+          const config = EVENT_CONFIG[event.kind] || {
+            icon: ArrowRightCircle,
+            label: event.kind,
+            color: 'var(--text-secondary)',
+          };
           const IconComponent = config.icon;
+
           return (
             <div
               key={index}
               className="trace-event animate-slide-in"
-              style={{ animationDelay: `${Math.min(index * 40, 300)}ms`, '--event-color': config.color }}
+              style={{ '--event-color': config.color }}
             >
-              <div className="event-indicator">
+              <div className="event-indicator" aria-hidden="true">
                 <div className="event-dot" />
                 {index < events.length - 1 && <div className="event-line" />}
               </div>
               <div className="event-card">
                 <div className="event-header">
-                  <IconComponent size={14} style={{ color: config.color }} />
+                  <IconComponent size={14} style={{ color: config.color }} aria-hidden="true" />
                   <span className="event-label" style={{ color: config.color }}>{config.label}</span>
                   <span className="event-index">#{index + 1}</span>
                 </div>

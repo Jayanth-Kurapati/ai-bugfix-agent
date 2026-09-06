@@ -3,6 +3,7 @@ import {
   FileCode2,
   Copy,
   Check,
+  Download,
   AlertTriangle,
   XCircle,
   CheckCircle2,
@@ -21,7 +22,7 @@ export default function DiffView({ diff, status }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback for non-secure contexts
+      // Fallback for non-secure / browser-restricted contexts
       const ta = document.createElement('textarea');
       ta.value = diff;
       ta.style.position = 'fixed';
@@ -35,60 +36,107 @@ export default function DiffView({ diff, status }) {
     }
   };
 
+  const handleDownload = () => {
+    try {
+      const blob = new Blob([diff], { type: 'text/x-diff;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'patch.diff';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      // Ignore download errors
+    }
+  };
+
   const lines = diff.split('\n');
 
+  // Compute addition / deletion metrics
+  let additions = 0;
+  let deletions = 0;
+  for (const line of lines) {
+    if (line.startsWith('+') && !line.startsWith('+++')) additions++;
+    else if (line.startsWith('-') && !line.startsWith('---')) deletions++;
+  }
+
   return (
-    <div className="diff-view glass-card animate-fade-in" id="diff-view">
+    <div className="diff-view surface-card animate-fade-in" id="diff-view">
+      {/* Header with Title and Actions */}
       <div className="diff-header">
         <div className="diff-title-group">
-          <div className="diff-icon-wrapper">
+          <div className="diff-icon-wrapper" aria-hidden="true">
             <FileCode2 size={16} />
           </div>
-          <h3 className="diff-title">Generated Patch</h3>
+          <div>
+            <h3 className="diff-title">Generated Patch</h3>
+            <div className="diff-stats-badge">
+              <span className="diff-badge-add">+{additions}</span>
+              <span className="diff-badge-del">−{deletions}</span>
+            </div>
+          </div>
         </div>
-        <button
-          className="btn btn-secondary btn-sm copy-btn"
-          onClick={handleCopy}
-          id="copy-diff-btn"
-        >
-          {copied ? (
-            <>
-              <Check size={14} className="text-success" />
-              <span>Copied!</span>
-            </>
-          ) : (
-            <>
-              <Copy size={14} />
-              <span>Copy Diff</span>
-            </>
-          )}
-        </button>
+
+        <div className="diff-actions">
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm copy-btn"
+            onClick={handleCopy}
+            id="copy-diff-btn"
+            title="Copy unified diff to clipboard"
+          >
+            {copied ? (
+              <>
+                <Check size={13} className="text-success" />
+                <span>Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy size={13} />
+                <span>Copy Diff</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm download-btn"
+            onClick={handleDownload}
+            id="download-diff-btn"
+            title="Download patch file as patch.diff"
+          >
+            <Download size={13} />
+            <span>Download .patch</span>
+          </button>
+        </div>
       </div>
 
-      {/* Honesty Status Banner whenever not verified */}
+      {/* Honesty Status Banner */}
       {status === 'blocked' && (
-        <div className="diff-status-banner diff-status-blocked" id="diff-status-indicator">
-          <AlertTriangle size={18} className="diff-status-icon" />
+        <div className="diff-status-banner diff-status-blocked" id="diff-status-indicator" role="alert">
+          <AlertTriangle size={17} className="diff-status-icon" aria-hidden="true" />
           <div className="diff-status-body">
-            <strong>Unverified — generated but not confirmed to fix the bug</strong>
-            <span>Sandbox execution is blocked on this host environment; patch has not been verified against the test suite.</span>
+            <strong>Verification Blocked</strong>
+            <span>Patch candidate was generated, but sandbox execution is blocked on this host environment. It has not been confirmed to fix the bug.</span>
           </div>
         </div>
       )}
 
       {status === 'failed' && (
-        <div className="diff-status-banner diff-status-failed" id="diff-status-indicator">
-          <XCircle size={18} className="diff-status-icon" />
+        <div className="diff-status-banner diff-status-failed" id="diff-status-indicator" role="alert">
+          <XCircle size={17} className="diff-status-icon" aria-hidden="true" />
           <div className="diff-status-body">
-            <strong>Unverified — patch verification failed</strong>
-            <span>A patch was generated, but it failed sandbox test execution or diff application.</span>
+            <strong>Verification Failed</strong>
+            <span>Patch candidate was generated, but failed sandbox test execution or diff application.</span>
           </div>
         </div>
       )}
 
       {status === 'verified' && (
-        <div className="diff-status-banner diff-status-verified" id="diff-status-indicator">
-          <CheckCircle2 size={18} className="diff-status-icon" />
+        <div className="diff-status-banner diff-status-verified" id="diff-status-indicator" role="status">
+          <CheckCircle2 size={17} className="diff-status-icon" aria-hidden="true" />
           <div className="diff-status-body">
             <strong>Verified Fix</strong>
             <span>Candidate patch successfully passed sandboxed test execution and judge verification.</span>
@@ -98,17 +146,18 @@ export default function DiffView({ diff, status }) {
 
       {(status === 'running' || status === 'queued') && (
         <div className="diff-status-banner diff-status-pending" id="diff-status-indicator">
-          <Loader2 size={18} className="diff-status-icon banner-spinner" />
+          <Loader2 size={17} className="diff-status-icon banner-spinner animate-spin" aria-hidden="true" />
           <div className="diff-status-body">
-            <strong>Verification in progress...</strong>
-            <span>Candidate patch generated; executing test verification in the sandbox.</span>
+            <strong>Verification in progress…</strong>
+            <span>Candidate patch generated; executing test verification inside the sandbox.</span>
           </div>
         </div>
       )}
 
+      {/* Technical IDE Code Window */}
       <div className="diff-window">
         <div className="diff-window-bar">
-          <div className="window-dots">
+          <div className="window-dots" aria-hidden="true">
             <span className="dot dot-red" />
             <span className="dot dot-yellow" />
             <span className="dot dot-green" />
@@ -117,7 +166,7 @@ export default function DiffView({ diff, status }) {
           <span className="window-meta">{lines.length} lines</span>
         </div>
         <div className="diff-content">
-          <pre className="diff-code">
+          <pre className="diff-code" tabIndex={0} aria-label="Unified patch diff content">
             {lines.map((line, i) => {
               let lineClass = 'diff-line';
               if (line.startsWith('+') && !line.startsWith('+++')) {
@@ -131,7 +180,7 @@ export default function DiffView({ diff, status }) {
               }
               return (
                 <div key={i} className={lineClass}>
-                  <span className="diff-line-num">{i + 1}</span>
+                  <span className="diff-line-num" aria-hidden="true">{i + 1}</span>
                   <span className="diff-line-content">{line || ' '}</span>
                 </div>
               );
