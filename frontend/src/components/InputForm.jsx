@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Code2, GitBranch, Sparkles, Play, Loader2, Bug } from 'lucide-react';
 import { generateRandomExample } from '../utils/exampleGenerator';
 import './InputForm.css';
 
@@ -45,12 +46,21 @@ export default function InputForm({ onSubmit, disabled }) {
   return (
     <form className="input-form glass-card animate-fade-in" onSubmit={handleSubmit} id="analyze-form">
       <div className="form-header">
-        <h2 className="form-title">
-          <span className="form-icon">🔍</span>
-          Analyze Bug
-        </h2>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={fillExample} disabled={disabled} id="fill-example-btn">
-          Try Example
+        <div className="form-title-group">
+          <div className="form-icon-wrapper">
+            <Bug className="form-icon" size={18} />
+          </div>
+          <h2 className="form-title">Analyze Bug</h2>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm try-example-btn"
+          onClick={fillExample}
+          disabled={disabled}
+          id="fill-example-btn"
+        >
+          <Sparkles size={14} />
+          <span>Try Example</span>
         </button>
       </div>
 
@@ -64,8 +74,8 @@ export default function InputForm({ onSubmit, disabled }) {
           disabled={disabled}
           id="mode-snippet-tab"
         >
-          <span className="tab-icon">📝</span>
-          Code Snippet
+          <Code2 size={16} />
+          <span>Code Snippet</span>
         </button>
         <button
           type="button"
@@ -76,29 +86,32 @@ export default function InputForm({ onSubmit, disabled }) {
           disabled={disabled}
           id="mode-repo-tab"
         >
-          <span className="tab-icon">📦</span>
-          GitHub Repo
+          <GitBranch size={16} />
+          <span>GitHub Repo</span>
         </button>
       </div>
 
       {mode === 'snippet' ? (
         <div className="form-fields animate-fade-in" key="snippet-fields">
           <div className="field-group">
-            <label className="label" htmlFor="code-input">Python Code</label>
+            <div className="label-row">
+              <label className="label" htmlFor="code-input">Python Code</label>
+              <span className="editor-lang-tag">python</span>
+            </div>
             <textarea
               id="code-input"
-              className="textarea"
+              className="textarea code-textarea"
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="Paste your buggy Python code here…"
-              rows={6}
+              rows={7}
               disabled={disabled}
               spellCheck={false}
             />
           </div>
 
           <div className="field-group">
-            <label className="label" htmlFor="test-type-select">Test Type</label>
+            <label className="label" htmlFor="test-type-select">Verification Target</label>
             <select
               id="test-type-select"
               className="select"
@@ -112,12 +125,15 @@ export default function InputForm({ onSubmit, disabled }) {
           </div>
 
           <div className="field-group">
-            <label className="label" htmlFor="test-content-input">
-              {testType === 'pytest' ? 'Test Function' : 'Error Traceback'}
-            </label>
+            <div className="label-row">
+              <label className="label" htmlFor="test-content-input">
+                {testType === 'pytest' ? 'Test Function' : 'Error Traceback'}
+              </label>
+              <span className="editor-lang-tag">{testType === 'pytest' ? 'pytest' : 'traceback'}</span>
+            </div>
             <textarea
               id="test-content-input"
-              className="textarea"
+              className="textarea code-textarea"
               value={testContent}
               onChange={(e) => setTestContent(e.target.value)}
               placeholder={testType === 'pytest'
@@ -148,7 +164,7 @@ export default function InputForm({ onSubmit, disabled }) {
             <label className="label" htmlFor="test-command-input">Test Command</label>
             <input
               id="test-command-input"
-              className="input"
+              className="input code-input"
               type="text"
               value={testCommand}
               onChange={(e) => setTestCommand(e.target.value)}
@@ -168,13 +184,13 @@ export default function InputForm({ onSubmit, disabled }) {
       >
         {disabled ? (
           <>
-            <span className="spinner" />
-            Analyzing…
+            <Loader2 size={16} className="btn-spinner" />
+            <span>Analyzing…</span>
           </>
         ) : (
           <>
-            <span>🚀</span>
-            Start Analysis
+            <Play size={15} />
+            <span>Start Analysis</span>
           </>
         )}
       </button>

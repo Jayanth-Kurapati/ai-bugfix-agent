@@ -1,12 +1,8 @@
-/* StatusBar styles */
+/* StatusBar styles - Architectural telemetry design */
 
 .status-bar {
-  padding: 16px 24px;
+  padding: 14px 22px;
   width: 100%;
-}
-
-.status-bar.terminal {
-  /* subtle emphasis on terminal states */
 }
 
 .status-row {
@@ -20,51 +16,63 @@
 .status-stats {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
 }
 
 .stat {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 2px;
 }
 
 .stat-label {
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 500;
 }
 
+.stat-icon {
+  opacity: 0.7;
+}
+
 .stat-value {
   font-family: var(--font-code);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .stat-divider {
   width: 1px;
-  height: 28px;
-  background: var(--glass-border);
+  height: 24px;
+  background: var(--border-subtle);
 }
 
 /* Status dot for running */
 .status-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: currentColor;
+  margin-left: 2px;
+}
+
+.badge-spinner {
+  animation: spin 0.8s linear infinite;
 }
 
 /* Call budget bar */
 .call-budget {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 80px;
+  gap: 3px;
+  min-width: 90px;
 }
 
 .budget-label {
@@ -77,10 +85,11 @@
 
 .budget-track {
   width: 100%;
-  height: 6px;
-  background: var(--bg-input);
+  height: 4px;
+  background: var(--surface-inset);
   border-radius: 999px;
   overflow: hidden;
+  border: 1px solid var(--border-subtle);
 }
 
 .budget-fill {
@@ -91,7 +100,7 @@
 
 /* Model unavailable state badge */
 .badge-model-unavailable {
-  background: rgba(244, 114, 182, 0.12);
+  background: rgba(244, 114, 182, 0.1);
   color: #f472b6;
   border: 1px solid rgba(244, 114, 182, 0.2);
 }
@@ -100,22 +109,24 @@
 .status-model-msg {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
   margin-top: 12px;
   padding: 10px 14px;
-  background: rgba(244, 114, 182, 0.08);
+  background: rgba(244, 114, 182, 0.06);
   border: 1px solid rgba(244, 114, 182, 0.15);
   border-radius: var(--radius-sm);
 }
 
 .model-msg-icon {
   flex-shrink: 0;
+  color: #f472b6;
+  margin-top: 2px;
 }
 
 .model-msg-text {
-  font-size: 13px;
+  font-size: 12.5px;
   color: #f472b6;
-  line-height: 1.4;
+  line-height: 1.5;
   word-break: break-word;
 }
 
@@ -123,21 +134,23 @@
 .status-error {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
   margin-top: 12px;
   padding: 10px 14px;
   background: var(--color-error-bg);
-  border: 1px solid rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.2);
   border-radius: var(--radius-sm);
 }
 
 .error-icon {
   flex-shrink: 0;
+  color: var(--color-error);
+  margin-top: 2px;
 }
 
 .error-text {
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--color-error);
-  line-height: 1.4;
+  line-height: 1.5;
   word-break: break-word;
 }

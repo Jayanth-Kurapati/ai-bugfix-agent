@@ -1,18 +1,32 @@
+import {
+  Search,
+  CheckCircle2,
+  HelpCircle,
+  Lightbulb,
+  ArrowRightCircle,
+  GitCommit,
+  Terminal,
+  Scale,
+  Flag,
+  Clock,
+  ScrollText,
+  AlertCircle,
+} from 'lucide-react';
 import './TraceView.css';
 
 /**
- * Maps trace event kind → display configuration.
+ * Maps trace event kind → display configuration with Lucide icons.
  */
 const EVENT_CONFIG = {
-  LINT:          { icon: '🔎', label: 'Lint Analysis', color: 'var(--color-info)' },
-  KNOWN:         { icon: '✅', label: 'Known Facts', color: 'var(--color-success)' },
-  UNKNOWN:       { icon: '❓', label: 'Unknowns', color: 'var(--color-warning)' },
-  HYPOTHESIS:    { icon: '💡', label: 'Hypothesis', color: 'var(--accent-primary)' },
-  'NEXT ACTION': { icon: '🎯', label: 'Next Action', color: 'var(--accent-secondary)' },
-  PATCH:         { icon: '🔧', label: 'Patch', color: 'var(--text-accent)' },
-  VERIFY:        { icon: '🧪', label: 'Verification', color: 'var(--color-info)' },
-  JUDGE:         { icon: '⚖️', label: 'Judge Verdict', color: 'var(--color-warning)' },
-  FINAL:         { icon: '🏁', label: 'Final', color: 'var(--text-primary)' },
+  LINT:          { icon: Search,           label: 'Lint Analysis', color: 'var(--color-info)' },
+  KNOWN:         { icon: CheckCircle2,     label: 'Known Facts',   color: 'var(--color-success)' },
+  UNKNOWN:       { icon: HelpCircle,       label: 'Unknowns',      color: 'var(--color-warning)' },
+  HYPOTHESIS:    { icon: Lightbulb,        label: 'Hypothesis',    color: 'var(--accent-primary)' },
+  'NEXT ACTION': { icon: ArrowRightCircle, label: 'Next Action',   color: '#38bdf8' },
+  PATCH:         { icon: GitCommit,        label: 'Patch',         color: '#a855f7' },
+  VERIFY:        { icon: Terminal,         label: 'Verification',  color: 'var(--color-info)' },
+  JUDGE:         { icon: Scale,            label: 'Judge Verdict', color: 'var(--color-warning)' },
+  FINAL:         { icon: Flag,             label: 'Final Status',  color: 'var(--text-primary)' },
 };
 
 function renderEventContent(event) {
@@ -47,7 +61,7 @@ function renderEventContent(event) {
           <p className="event-message">{message}</p>
           {data.target_files && data.target_files.length > 0 && (
             <div className="target-files">
-              <span className="target-label">Target files: </span>
+              <span className="target-label">Target files:</span>
               {data.target_files.map((f, i) => (
                 <code key={i} className="target-file">{f}</code>
               ))}
@@ -65,7 +79,7 @@ function renderEventContent(event) {
               <span className="meta-tag">Findings: {data.findings}</span>
             )}
             {data.exit_code !== undefined && (
-              <span className="meta-tag">Exit: {data.exit_code}</span>
+              <span className="meta-tag">Exit code: {data.exit_code}</span>
             )}
           </div>
         </div>
@@ -77,7 +91,7 @@ function renderEventContent(event) {
           <p className="event-message">{message}</p>
           {data.patched_files && data.patched_files.length > 0 && (
             <div className="target-files">
-              <span className="target-label">Patched: </span>
+              <span className="target-label">Patched:</span>
               {data.patched_files.map((f, i) => (
                 <code key={i} className="target-file">{f}</code>
               ))}
@@ -94,17 +108,17 @@ function renderEventContent(event) {
             {message}
           </p>
           {data.exit_code !== undefined && (
-            <span className="meta-tag">Exit: {data.exit_code}</span>
+            <span className="meta-tag">Exit code: {data.exit_code}</span>
           )}
           {data.stdout && (
             <details className="verify-details">
-              <summary>stdout</summary>
+              <summary>Standard Output (stdout)</summary>
               <pre className="verify-output">{data.stdout}</pre>
             </details>
           )}
           {data.stderr && (
             <details className="verify-details">
-              <summary>stderr</summary>
+              <summary>Standard Error (stderr)</summary>
               <pre className="verify-output">{data.stderr}</pre>
             </details>
           )}
@@ -117,7 +131,17 @@ function renderEventContent(event) {
           <p className="event-message">{message}</p>
           {data.genuine_fix !== undefined && (
             <div className={`judge-badge ${data.genuine_fix ? 'genuine' : 'rejected'}`}>
-              {data.genuine_fix ? '✅ Genuine Fix' : '❌ Not a Genuine Fix'}
+              {data.genuine_fix ? (
+                <>
+                  <CheckCircle2 size={13} />
+                  <span>Genuine Fix Verified</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle size={13} />
+                  <span>Rejected — Not a Genuine Fix</span>
+                </>
+              )}
             </div>
           )}
           {data.reasoning && (
@@ -151,7 +175,9 @@ export default function TraceView({ events }) {
     return (
       <div className="trace-view glass-card animate-fade-in" id="trace-view">
         <div className="trace-empty">
-          <div className="trace-empty-icon animate-pulse">⏳</div>
+          <div className="trace-empty-icon animate-pulse">
+            <Clock size={28} />
+          </div>
           <p>Waiting for trace events…</p>
         </div>
       </div>
@@ -160,18 +186,23 @@ export default function TraceView({ events }) {
 
   return (
     <div className="trace-view glass-card" id="trace-view">
-      <h3 className="trace-title">
-        <span>📋</span> Reasoning Trace
+      <div className="trace-header">
+        <div className="trace-title-group">
+          <ScrollText size={18} className="trace-header-icon" />
+          <h3 className="trace-title">Reasoning Trace</h3>
+        </div>
         <span className="event-count">{events.length} events</span>
-      </h3>
+      </div>
+
       <div className="trace-timeline">
         {events.map((event, index) => {
-          const config = EVENT_CONFIG[event.kind] || { icon: '📌', label: event.kind, color: 'var(--text-secondary)' };
+          const config = EVENT_CONFIG[event.kind] || { icon: ArrowRightCircle, label: event.kind, color: 'var(--text-secondary)' };
+          const IconComponent = config.icon;
           return (
             <div
               key={index}
               className="trace-event animate-slide-in"
-              style={{ animationDelay: `${Math.min(index * 50, 400)}ms`, '--event-color': config.color }}
+              style={{ animationDelay: `${Math.min(index * 40, 300)}ms`, '--event-color': config.color }}
             >
               <div className="event-indicator">
                 <div className="event-dot" />
@@ -179,7 +210,7 @@ export default function TraceView({ events }) {
               </div>
               <div className="event-card">
                 <div className="event-header">
-                  <span className="event-icon">{config.icon}</span>
+                  <IconComponent size={14} style={{ color: config.color }} />
                   <span className="event-label" style={{ color: config.color }}>{config.label}</span>
                   <span className="event-index">#{index + 1}</span>
                 </div>
