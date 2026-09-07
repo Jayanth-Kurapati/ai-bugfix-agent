@@ -72,5 +72,12 @@ A GenAI Developer Intern build-sprint MVP: an agentic bug-fixing tool. Input: a 
 
 ## Current status
 *(Update this line at the end of each session so the next session starts oriented.)*
-Phase complete (2026-09-07): Full Render deployment successful and live at https://ai-bugfix-agent.onrender.com. Configured via render.yaml blueprint with free-tier Python 3.11 runtime. Live post-deploy verification confirmed: GET /health returns 200 (~1.6s warm, ~40s cold start); snippet mode ('tally_points') confirmed genuinely 'verified' in 25.6s with Linux POSIX sandbox limits; GitHub repo mode confirmed genuinely 'verified' in 32.8s on public repo https://github.com/Jayanth-Kurapati/buggy-python-demo. README and repository updated.
+Phase complete (2026-09-07): Production hardening pass fully implemented, tested, and deployed to https://ai-bugfix-agent.onrender.com. Hardening controls verified:
+1. Sandbox secret redaction & path normalization (API keys & host directories never leak).
+2. Patch integrity verification (prevents test suite weakening, assertion deletion, and runner hijacking).
+3. Traceback pre-verification reproduction check (honest 'verification_inconclusive' status when not reproduced).
+4. Authoritative server-side iteration tracking and SSE fallback cleanup race condition resolved.
+5. Frontend UX telemetry overhauled: removed non-enforced fake budget meter, added UNVERIFIED PATCH distinction banners, and supported all terminal statuses ('verification_inconclusive', 'repository_error', 'invalid_input').
+6. 52/52 backend tests passing (including new test_hardening.py suite). Pushed to origin/main. Live health check 200 OK.
+
 
