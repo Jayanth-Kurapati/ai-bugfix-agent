@@ -1,7 +1,15 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 
 const API_BASE = '/api';
-const TERMINAL_STATUSES = new Set(['verified', 'failed', 'blocked', 'model_unavailable']);
+const TERMINAL_STATUSES = new Set([
+  'verified',
+  'failed',
+  'blocked',
+  'model_unavailable',
+  'verification_inconclusive',
+  'repository_error',
+  'invalid_input',
+]);
 
 /**
  * Robust custom hook for job submission, live SSE streaming, and resilient polling fallback.
@@ -10,13 +18,14 @@ const TERMINAL_STATUSES = new Set(['verified', 'failed', 'blocked', 'model_unava
  * - Failed submission keeps phase in 'idle' with submitError, NEVER unmounting the form.
  * - Stale job updates are discarded via currentJobIdRef guarding.
  * - Parse failures on 'final' event fallback to GET /api/jobs/{id} to recover the final state.
+ * - Polling interval is never prematurely cancelled during recovery.
  * - Cleanup is guaranteed on unmount, terminal status, or reset.
  */
 export function useJobStream() {
   const [state, setState] = useState({
     phase: 'idle',       // idle | submitting | streaming | done
     jobId: null,
-    status: null,        // queued | running | verified | failed | blocked | model_unavailable
+    status: null,        // queued | running | verified | failed | blocked | model_unavailable | verification_inconclusive | repository_error | invalid_input
     events: [],          // array of trace event objects
     finalJob: null,      // full final JobResponse
     error: null,         // runtime / execution / judge error
@@ -50,6 +59,13 @@ export function useJobStream() {
   const fetchJobDirectly = useCallback(async (jobId) => {
     try {
       const res = await fetch(`${API_BASE}/jobs/${jobId}`);
+      if (res.status === 404) {
+        return {
+          status: 'failed',
+          error: 'This analysis session expired because the server restarted or does not exist.',
+          expired: true,
+        };
+      }
       if (!res.ok) return null;
       return await res.json();
     } catch {
@@ -76,7 +92,7 @@ export function useJobStream() {
         // Verify still current
         if (currentJobIdRef.current !== jobId) return;
 
-        const isTerminal = TERMINAL_STATUSES.has(data.status);
+        const isTerminal = TERMINAL_STATUSES.has(data.status) || data.expired;
         setState(prev => ({
           ...prev,
           status: data.status,
@@ -116,8 +132,8 @@ export function useJobStream() {
           if (currentJobIdRef.current !== jobId) return prev;
           const newEvents = [...prev.events, event];
           let iterationCount = prev.iterationCount;
-          if (event.kind === 'HYPOTHESIS') {
-            iterationCount += 1;
+          if (event.kind === 'ITERATION' && event.data?.iteration) {
+            iterationCount = Number(event.data.iteration);
           }
           return {
             ...prev,
@@ -154,11 +170,15 @@ export function useJobStream() {
           iterationCount: job.iteration_count ?? prev.iterationCount,
           error: job.error ?? null,
         }));
+        cleanup();
       } else {
-        // If recovery still failed, poll once
+        // Close SSE stream so it does not interfere with polling, but DO NOT clear polling!
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
         startPollingFallback(jobId);
       }
-      cleanup();
     });
 
     es.onerror = () => {

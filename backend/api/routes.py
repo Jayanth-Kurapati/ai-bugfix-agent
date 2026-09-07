@@ -54,7 +54,7 @@ def _run_job(request: AnalyzeRequest, job_id: UUID, store: JobStore, client) -> 
                 time.sleep(0.3)
             verification = SandboxResult(True, 0, "1 passed in 0.02s", "", False, "passed", None)
             result = OrchestrationResult(
-                "verified", events, fake_diff, verification, True, "Operator changed from - to +; test passes genuinely.", 3
+                "verified", events, fake_diff, verification, True, "Operator changed from - to +; test passes genuinely.", 3, None, 1
             )
         elif os.getenv("MOCK_ORCHESTRATOR", "").strip() == "blocked":
             import time
@@ -86,7 +86,7 @@ def _run_job(request: AnalyzeRequest, job_id: UUID, store: JobStore, client) -> 
                 time.sleep(0.3)
             verification = SandboxResult(False, None, "", "", False, "unsupported_platform", "Sandbox execution requires a POSIX platform with resource limits.")
             result = OrchestrationResult(
-                "blocked", events, fake_diff, verification, None, None, 2, "Sandbox execution requires a POSIX platform with resource limits."
+                "blocked", events, fake_diff, verification, None, None, 2, "Sandbox execution requires a POSIX platform with resource limits.", 1
             )
         elif os.getenv("MOCK_ORCHESTRATOR", "").strip() == "failed":
             import time
@@ -115,14 +115,14 @@ def _run_job(request: AnalyzeRequest, job_id: UUID, store: JobStore, client) -> 
                 time.sleep(0.3)
             verification = SandboxResult(False, 1, "", "AssertionError: Expected 5, got 6", False, "failed", "Verification failed.")
             result = OrchestrationResult(
-                "failed", events, fake_diff, verification, False, "Fix did not pass tests.", 2, "Test failed: AssertionError: Expected 5, got 6"
+                "failed", events, fake_diff, verification, False, "Fix did not pass tests.", 2, "Test failed: AssertionError: Expected 5, got 6", 1
             )
         else:
             result = run_analysis(request, client.for_job(), on_event=lambda event: store.append_event(job_id, event))
     except Exception as exc:  # Keep background failures observable by polling/SSE.
         from backend.agent.orchestrator import OrchestrationResult
 
-        result = OrchestrationResult("failed", [], None, None, None, None, 0, f"Unexpected job failure: {exc}")
+        result = OrchestrationResult("failed", [], None, None, None, None, 0, f"Unexpected job failure: {exc}", 1)
     store.complete(job_id, result)
 
 
@@ -146,7 +146,10 @@ def get_job(job_id: UUID, request: Request) -> JobResponse:
 
     job = _job_store(request).get(job_id)
     if job is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found",
+        )
     return job
 
 
@@ -156,7 +159,10 @@ def stream_job(job_id: UUID, request: Request) -> StreamingResponse:
 
     store = _job_store(request)
     if store.get(job_id) is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found",
+        )
 
     def event_stream():
         index = 0

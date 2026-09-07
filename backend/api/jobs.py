@@ -59,8 +59,8 @@ class JobStore:
         with record.condition:
             trace = [*record.state.trace, TraceEventResponse(kind=event.kind, message=event.message, data=event.data)]
             updates: dict[str, object] = {"trace": trace}
-            if event.kind == "HYPOTHESIS":
-                updates["iteration_count"] = record.state.iteration_count + 1
+            if event.kind == "ITERATION" and "iteration" in event.data:
+                updates["iteration_count"] = int(event.data["iteration"])
             record.state = record.state.model_copy(update=updates)
             record.condition.notify_all()
 
@@ -68,12 +68,22 @@ class JobStore:
         record = self._record(job_id)
         if record is None:
             return
+        valid_statuses = {
+            "verified",
+            "failed",
+            "blocked",
+            "model_unavailable",
+            "verification_inconclusive",
+            "repository_error",
+            "invalid_input",
+        }
         verification = result.verification.__dict__ if result.verification is not None else None
         with record.condition:
             record.state = record.state.model_copy(
                 update={
-                    "status": result.status if result.status in {"verified", "failed", "blocked", "model_unavailable"} else "failed",
+                    "status": result.status if result.status in valid_statuses else "failed",
                     "llm_call_count": result.llm_call_count,
+                    "iteration_count": result.iteration_count,
                     "diff": result.diff,
                     "verification": verification,
                     "judge_verdict": result.judge_verdict,

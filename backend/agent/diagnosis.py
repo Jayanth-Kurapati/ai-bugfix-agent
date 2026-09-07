@@ -14,6 +14,7 @@ MAX_SOURCE_CHARS_PER_FILE = 6_000
 MAX_BUG_REPORT_CHARS = 4_000
 MAX_TREE_ENTRIES = 100
 MAX_PREVIOUS_FAILURE_CHARS = 4_000
+MAX_PREVIOUS_DIFF_CHARS = 4_000
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,8 @@ class DiagnosisContext:
     lint_findings: Sequence[LintFinding]
     repo_tree: Sequence[str] = ()
     previous_verification_failure: str | None = None
+    previous_diff: str | None = None
+    previous_hypothesis: str | None = None
 
 
 @dataclass(frozen=True)
@@ -63,6 +66,20 @@ def build_diagnosis_messages(context: DiagnosisContext) -> list[dict[str, str]]:
         _untrusted_section("REPOSITORY_TREE", "\n".join(tree_lines) or "Not provided."),
         "\n\n".join(source_sections) or _untrusted_section("SOURCE_FILES", "No relevant source supplied."),
     ]
+    if context.previous_hypothesis is not None:
+        sections.append(
+            _untrusted_section(
+                "PREVIOUS_FAILED_HYPOTHESIS",
+                _truncate(context.previous_hypothesis, 1_000),
+            )
+        )
+    if context.previous_diff is not None:
+        sections.append(
+            _untrusted_section(
+                "PREVIOUS_FAILED_DIFF",
+                _truncate(context.previous_diff, MAX_PREVIOUS_DIFF_CHARS),
+            )
+        )
     if context.previous_verification_failure is not None:
         sections.append(
             _untrusted_section(

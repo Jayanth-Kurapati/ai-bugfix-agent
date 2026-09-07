@@ -203,6 +203,45 @@ export default function App() {
                         </div>
                       </>
                     )}
+                    {status === 'verification_inconclusive' && (
+                      <>
+                        <div className="verdict-icon-box status-blocked-box" aria-hidden="true">
+                          <AlertTriangle size={22} className="color-warning" />
+                        </div>
+                        <div>
+                          <h2 className="verdict-title">Verification Inconclusive</h2>
+                          <p className="verdict-subtitle">
+                            The reported failure could not be deterministically reproduced in the verification environment.
+                          </p>
+                        </div>
+                      </>
+                    )}
+                    {status === 'repository_error' && (
+                      <>
+                        <div className="verdict-icon-box status-failed-box" aria-hidden="true">
+                          <XCircle size={22} className="color-error" />
+                        </div>
+                        <div>
+                          <h2 className="verdict-title">Repository Error</h2>
+                          <p className="verdict-subtitle">
+                            The repository could not be cloned or processed. Please verify repository URL and visibility.
+                          </p>
+                        </div>
+                      </>
+                    )}
+                    {status === 'invalid_input' && (
+                      <>
+                        <div className="verdict-icon-box status-failed-box" aria-hidden="true">
+                          <XCircle size={22} className="color-error" />
+                        </div>
+                        <div>
+                          <h2 className="verdict-title">Invalid Input Syntax</h2>
+                          <p className="verdict-subtitle">
+                            This MVP supports Python only by design. No valid Python code was found in the input.
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <span className={`status-pill status-pill-${status}`}>{status}</span>
                 </div>

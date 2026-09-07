@@ -48,6 +48,9 @@ class SandboxResult:
     error: str | None = None
 
 
+MAX_OUTPUT_CHARS = 16_384
+
+
 def _supports_posix_sandbox() -> bool:
     return os.name == "posix" and resource is not None
 
@@ -58,6 +61,12 @@ def _set_resource_limits(limits: SandboxLimits) -> None:
     assert resource is not None
     resource.setrlimit(resource.RLIMIT_CPU, (limits.cpu_seconds, limits.cpu_seconds))
     resource.setrlimit(resource.RLIMIT_AS, (limits.memory_bytes, limits.memory_bytes))
+    if hasattr(resource, "RLIMIT_NPROC"):
+        try:
+            # Constrain process spawning (mitigate fork bombs)
+            resource.setrlimit(resource.RLIMIT_NPROC, (64, 64))
+        except (ValueError, OSError):
+            pass
 
 
 def _as_text(value: str | bytes | None) -> str:
@@ -66,6 +75,36 @@ def _as_text(value: str | bytes | None) -> str:
     if isinstance(value, bytes):
         return value.decode(errors="replace")
     return value
+
+
+import re
+
+_SECRET_PATTERN = re.compile(r"(?:sk-[a-zA-Z0-9_\-]{20,}|Bearer\s+[a-zA-Z0-9_\-\.]{20,})", re.IGNORECASE)
+
+
+def _sanitize_output(
+    value: str | bytes | None,
+    workspace_path: Path | None = None,
+    max_chars: int = MAX_OUTPUT_CHARS,
+) -> str:
+    text = _as_text(value)
+    if not text:
+        return ""
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if api_key and len(api_key) > 6:
+        text = text.replace(api_key, "[REDACTED_API_KEY]")
+    text = _SECRET_PATTERN.sub("[REDACTED_SECRET]", text)
+    if workspace_path is not None:
+        norm_fwd = str(workspace_path).replace("\\", "/")
+        norm_back = str(workspace_path).replace("/", "\\")
+        text = text.replace(norm_fwd, "./workspace").replace(norm_back, "./workspace")
+    if len(text) > max_chars:
+        return text[:max_chars] + f"\n... [output bounded at {max_chars} chars]"
+    return text
+
+
+def _bounded_text(value: str | bytes | None, max_chars: int = MAX_OUTPUT_CHARS) -> str:
+    return _sanitize_output(value, max_chars=max_chars)
 
 
 def _valid_relative_script(script_path: Path) -> bool:
@@ -107,7 +146,8 @@ def run_python(
     active_limits = limits or SandboxLimits()
     try:
         with tempfile.TemporaryDirectory(prefix="bugfix-job-") as temporary_root:
-            copied_workspace = Path(temporary_root) / "workspace"
+            temp_path = Path(temporary_root)
+            copied_workspace = temp_path / "workspace"
             shutil.copytree(source_workspace, copied_workspace)
             copied_script = (copied_workspace / relative_script).resolve()
             if not copied_script.is_file() or copied_workspace not in copied_script.parents:
@@ -121,30 +161,51 @@ def run_python(
                     "Script does not exist inside the copied workspace.",
                 )
 
+            # Construct clean, unprivileged execution environment.
+            # Secrets (e.g. OPENROUTER_API_KEY, cloud/Render tokens) are NEVER passed.
+            safe_env = {
+                "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"),
+                "LANG": os.environ.get("LANG", "en_US.UTF-8"),
+                "LC_ALL": os.environ.get("LC_ALL", "en_US.UTF-8"),
+                "HOME": str(temp_path),
+                "TMPDIR": str(temp_path),
+                "PYTHONUNBUFFERED": "1",
+                "PYTHONDONTWRITEBYTECODE": "1",
+            }
+            for var in ("SYSTEMROOT", "WINDIR", "COMSPEC"):
+                if var in os.environ:
+                    safe_env[var] = os.environ[var]
+
             process = subprocess.Popen(
                 [sys.executable, str(relative_script), *args],
                 cwd=copied_workspace,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                env=safe_env,
                 start_new_session=True,
                 preexec_fn=lambda: _set_resource_limits(active_limits),
             )
             try:
-                stdout, stderr = process.communicate(timeout=active_limits.wall_timeout_seconds)
+                raw_stdout, raw_stderr = process.communicate(timeout=active_limits.wall_timeout_seconds)
             except subprocess.TimeoutExpired as exc:
-                os.killpg(process.pid, signal.SIGKILL)
-                stdout, stderr = process.communicate()
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except (OSError, ProcessLookupError):
+                    process.kill()
+                raw_stdout, raw_stderr = process.communicate()
                 return SandboxResult(
                     success=False,
                     exit_code=process.returncode,
-                    stdout=_as_text(stdout) or _as_text(exc.output),
-                    stderr=_as_text(stderr) or _as_text(exc.stderr),
+                    stdout=_sanitize_output(_as_text(raw_stdout) or _as_text(exc.output), copied_workspace),
+                    stderr=_sanitize_output(_as_text(raw_stderr) or _as_text(exc.stderr), copied_workspace),
                     timed_out=True,
                     status="timed_out",
                     error="Wall-clock timeout exceeded.",
                 )
 
+            stdout = _sanitize_output(raw_stdout, copied_workspace)
+            stderr = _sanitize_output(raw_stderr, copied_workspace)
             return SandboxResult(
                 success=process.returncode == 0,
                 exit_code=process.returncode,
@@ -154,4 +215,4 @@ def run_python(
                 status="passed" if process.returncode == 0 else "failed",
             )
     except (OSError, shutil.Error) as exc:
-        return SandboxResult(False, None, "", "", False, "execution_error", str(exc))
+        return SandboxResult(False, None, "", "", False, "execution_error", "Execution failed due to an OS-level error.")

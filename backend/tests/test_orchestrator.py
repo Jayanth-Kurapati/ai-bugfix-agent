@@ -156,7 +156,7 @@ def test_non_python_snippet_rejected_with_honest_message() -> None:
         test_content="def test_add(): pass",
     )
     result = orchestrator.run_analysis(non_python, FakeClient())
-    assert result.status == "failed"
+    assert result.status in {"failed", "invalid_input"}
     assert "This MVP supports Python only by design" in (result.error or "")
     assert "multi-language support is a documented next step, not a bug" in (result.error or "")
 
@@ -169,6 +169,6 @@ def test_empty_repo_rejected_with_honest_message(monkeypatch) -> None:
         test_command="pytest",
     )
     result = orchestrator.run_analysis(repo_request, FakeClient())
-    assert result.status == "failed"
+    assert result.status in {"failed", "invalid_input"}
     assert "This MVP supports Python only by design" in (result.error or "")
     assert "multi-language support is a documented next step, not a bug" in (result.error or "")

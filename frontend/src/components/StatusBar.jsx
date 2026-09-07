@@ -11,15 +11,15 @@ import {
 } from 'lucide-react';
 import './StatusBar.css';
 
-// Soft cap per job reflecting maximum calls a single job can make
-const MAX_CALLS_PER_JOB = 12;
-
 function deriveAgentStage(status, events) {
   if (status === 'queued') return { label: 'Queued in Workstation', stage: 'queued' };
   if (status === 'verified') return { label: 'Bug Fixed & Verified', stage: 'verified' };
   if (status === 'failed') return { label: 'Verification Failed', stage: 'failed' };
   if (status === 'blocked') return { label: 'Execution Blocked by Sandbox', stage: 'blocked' };
   if (status === 'model_unavailable') return { label: 'Free Models Unavailable', stage: 'model_unavailable' };
+  if (status === 'verification_inconclusive') return { label: 'Verification Inconclusive', stage: 'verification_inconclusive' };
+  if (status === 'repository_error') return { label: 'Repository Error', stage: 'repository_error' };
+  if (status === 'invalid_input') return { label: 'Invalid Input Syntax', stage: 'invalid_input' };
 
   // Status is running — derive lifecycle from the last event
   if (events && events.length > 0) {
@@ -46,8 +46,15 @@ export default function StatusBar({
   if (!status) return null;
 
   const currentStage = deriveAgentStage(status, events);
-  const budgetPercent = Math.min((llmCallCount / MAX_CALLS_PER_JOB) * 100, 100);
-  const isTerminal = ['verified', 'failed', 'blocked', 'model_unavailable'].includes(status);
+  const isTerminal = [
+    'verified',
+    'failed',
+    'blocked',
+    'model_unavailable',
+    'verification_inconclusive',
+    'repository_error',
+    'invalid_input',
+  ].includes(status);
   const isRunning = status === 'running' || status === 'queued';
 
   return (
@@ -71,6 +78,8 @@ export default function StatusBar({
               <AlertTriangle size={13} aria-hidden="true" />
             ) : status === 'model_unavailable' ? (
               <Unplug size={13} aria-hidden="true" />
+            ) : status === 'verification_inconclusive' ? (
+              <AlertTriangle size={13} aria-hidden="true" />
             ) : (
               <Clock size={13} aria-hidden="true" />
             )}
@@ -78,7 +87,7 @@ export default function StatusBar({
             {isRunning && <span className="status-dot animate-pulse" aria-hidden="true" />}
           </div>
 
-          {/* Inline Retry if terminated with error/blocked */}
+          {/* Inline Retry if terminated with error/blocked/inconclusive */}
           {isTerminal && status !== 'verified' && onRetry && (
             <button
               type="button"
@@ -110,26 +119,6 @@ export default function StatusBar({
               Model Calls
             </span>
             <span className="stat-value">{llmCallCount}</span>
-          </div>
-
-          {/* Agent Budget Meter */}
-          <div
-            className="call-budget"
-            id="call-budget-indicator"
-            title={`${llmCallCount} of ${MAX_CALLS_PER_JOB} max job calls allocated`}
-          >
-            <span className="budget-label">Agent budget</span>
-            <div className="budget-track" role="progressbar" aria-valuenow={llmCallCount} aria-valuemin={0} aria-valuemax={MAX_CALLS_PER_JOB}>
-              <div
-                className="budget-fill"
-                style={{
-                  width: `${budgetPercent}%`,
-                  background: budgetPercent > 75
-                    ? 'var(--color-warning)'
-                    : 'var(--accent-primary)',
-                }}
-              />
-            </div>
           </div>
         </div>
       </div>

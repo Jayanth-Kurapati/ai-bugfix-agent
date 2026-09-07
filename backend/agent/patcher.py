@@ -220,3 +220,54 @@ def apply_unified_diff(
             shutil.rmtree(destination_workspace, ignore_errors=True)
         return PatchResult(False, "application_failed", diff, False, None, [], str(exc))
     return PatchResult(True, "applied", diff, True, destination, patched_files)
+
+
+def check_patch_integrity(
+    diff: str,
+    mode: str,
+    target_files: Sequence[str] | None = None,
+) -> tuple[bool, str | None]:
+    """Validate that a candidate diff does not game tests, bypass verification, or modify forbidden files."""
+    try:
+        parsed_files = _parse_unified_diff(diff)
+    except PatchValidationError as exc:
+        return False, f"Malformed patch diff: {exc}"
+
+    for path_str, hunks in parsed_files:
+        p = PurePosixPath(path_str)
+        # Snippet mode rule: Only snippet.py can be modified
+        if mode == "snippet":
+            if p.name != "snippet.py":
+                return False, f"Patch integrity check failed: modifying '{path_str}' is forbidden in snippet mode (only 'snippet.py' may be modified)."
+        else:
+            # Repo mode rules:
+            # 1. Reject modification of test config files
+            if p.name in {"pytest.ini", "conftest.py", "setup.cfg", "tox.ini", "pyproject.toml"}:
+                return False, f"Patch integrity check failed: modifying test configuration '{path_str}' is forbidden."
+
+            # 2. Check if test files are modified suspiciously
+            is_test_file = "tests" in p.parts or "test" in p.parts or p.name.startswith("test_") or p.name.endswith("_test.py")
+            if is_test_file:
+                for _, _, _, _, hunk_lines in hunks:
+                    for line in hunk_lines:
+                        if line.startswith("-"):
+                            deleted = line[1:].strip()
+                            if deleted.startswith("assert ") or deleted.startswith("assert(") or "pytest.raises" in deleted:
+                                return False, f"Patch integrity check failed: deleting test assertions in '{path_str}' is strictly forbidden."
+                        if line.startswith("+"):
+                            added = line[1:].strip()
+                            if any(added.startswith(tok) for tok in ["@pytest.mark.skip", "@pytest.mark.xfail", "pytest.skip("]):
+                                return False, f"Patch integrity check failed: disabling tests via skip/xfail in '{path_str}' is forbidden."
+
+        # General anti-tampering checks across all files:
+        for _, _, _, _, hunk_lines in hunks:
+            for line in hunk_lines:
+                if line.startswith("+"):
+                    added = line[1:].strip()
+                    if "sys.modules['pytest']" in added or 'sys.modules["pytest"]' in added:
+                        return False, "Patch integrity check failed: attempting to mock test runner modules is forbidden."
+                    if added.startswith("os._exit(") or added.startswith("sys.exit(0)"):
+                        return False, "Patch integrity check failed: injecting raw exit calls into source is forbidden."
+
+    return True, None
+

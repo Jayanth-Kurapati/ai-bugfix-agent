@@ -159,16 +159,19 @@ GET  /health          → { status: "ok" }
 - Tests execute via argument lists (`[sys.executable, "-m", "pytest", ...]`), never `shell=True`.
 - Repository test commands are tokenized with `shlex.split` and validated: shell metacharacters, command separators, redirects, expansions, and absolute/escaping paths are all rejected.
 - The original workspace (upload or clone) is **never mutated**. Diffs are applied only to a copy.
+- **Output Sanitization & Secret Redaction**: All stdout/stderr outputs redact API keys (e.g. `sk-...`, Bearer tokens) and normalize temporary host paths (`./workspace/...`) to prevent credential and filesystem leakage.
 
-### Patch Handling
+### Patch Handling & Integrity Checks
 
 - Patches are **staged/displayed only**. A candidate unified diff is retained in the in-memory job and shown to the user after sandbox verification.
 - Patches are **never** applied to the original workspace, Git-staged, committed, pushed, or written back to any repository.
+- **Patch Integrity Enforcement**: Patches are statically analyzed before application. Any patch that attempts to weaken test suites (deleting `assert` statements, adding `@pytest.mark.skip`/`xfail`, monkeypatching test runners, or modifying files outside diagnosed targets) is rejected immediately.
+- **Traceback Reproduction Check**: Traceback snippets must deterministically fail in the sandbox *before* patching; otherwise the job concludes with `verification_inconclusive` to prevent falsely claiming a fix.
 
 ### LLM Interaction
 
 - All LLM responses must be structured JSON matching exact schemas. Malformed responses get one retry; a second failure terminates the job cleanly.
-- Every LLM call is counted and exposed to the frontend.
+- Every LLM call is counted and exposed to the frontend with transparent, honest telemetry.
 - Only free-tier OpenRouter models are used. Model discovery happens at startup; no model ID is hardcoded.
 
 ---

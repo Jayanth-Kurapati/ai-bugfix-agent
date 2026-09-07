@@ -114,11 +114,21 @@ export default function DiffView({ diff, status }) {
       </div>
 
       {/* Honesty Status Banner */}
+      {status === 'verification_inconclusive' && (
+        <div className="diff-status-banner diff-status-blocked" id="diff-status-indicator" role="alert">
+          <AlertTriangle size={17} className="diff-status-icon" aria-hidden="true" />
+          <div className="diff-status-body">
+            <strong>UNVERIFIED PATCH — Verification Inconclusive</strong>
+            <span>Patch candidate was generated, but the reported failure could not be deterministically reproduced in the verification environment.</span>
+          </div>
+        </div>
+      )}
+
       {status === 'blocked' && (
         <div className="diff-status-banner diff-status-blocked" id="diff-status-indicator" role="alert">
           <AlertTriangle size={17} className="diff-status-icon" aria-hidden="true" />
           <div className="diff-status-body">
-            <strong>Verification Blocked</strong>
+            <strong>UNVERIFIED PATCH — Verification Blocked</strong>
             <span>Patch candidate was generated, but sandbox execution is blocked on this host environment. It has not been confirmed to fix the bug.</span>
           </div>
         </div>
@@ -128,7 +138,7 @@ export default function DiffView({ diff, status }) {
         <div className="diff-status-banner diff-status-failed" id="diff-status-indicator" role="alert">
           <XCircle size={17} className="diff-status-icon" aria-hidden="true" />
           <div className="diff-status-body">
-            <strong>Verification Failed</strong>
+            <strong>UNVERIFIED PATCH — Verification Failed</strong>
             <span>Patch candidate was generated, but failed sandbox test execution or diff application.</span>
           </div>
         </div>
