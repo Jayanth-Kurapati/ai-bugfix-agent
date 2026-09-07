@@ -55,4 +55,16 @@ Entry format:
   5. In `_apply_hunks()`, preserved original file indentation for context lines and matched additions to replaced block indentation.
 - Verification: 16 out of 16 runs across all 8 bug templates (both Pytest and Traceback modes) passed end-to-end with real OpenRouter LLM calls, consistently reaching `status="blocked"` at the sandbox boundary. Backend test suite passed 43/43 (3 skipped on Windows).
 
+## [Sandbox Hardening] BlockingIOError fork failure & raw traceback leakage — RESOLVED (2026-09-07)
+- Attempted: Sandbox verification of pytest snippets on Render Linux container
+- Symptom: Verification failed with `BlockingIOError: [Errno 11] Resource temporarily unavailable` from `subprocess.run` inside `__verify__.py`, and the raw traceback with internal server paths leaked into the UI execution note and banner
+- Hypothesis: (1) `RLIMIT_NPROC=64` set via `setrlimit` in `runner.py` applies to the entire user ID (`render` UID 1000) across all container processes/threads, causing fork attempts to fail with `EAGAIN`; (2) `_verify_candidate` wrote a wrapper script calling `subprocess.run([sys.executable, '-m', 'pytest'])`, creating an unnecessary nested subprocess fork; (3) Sandbox stderr was passed unmodified into `latest_verification.stderr` without checking for OS-level runtime failures
+- Fix:
+  1. Omitted `RLIMIT_NPROC` in `backend/sandbox/runner.py` to prevent suffocating the container-wide process table while preserving memory and CPU limits.
+  2. Guaranteed child process reaping in `backend/sandbox/runner.py` with `process.poll() is None` cleanup, `killpg(SIGKILL)`, and `process.wait()` in a `finally:` block to prevent zombie processes.
+  3. Replaced `subprocess.run` inside `__verify__.py` with in-process `pytest.main(pytest_arguments)`, eliminating the inner subprocess fork entirely.
+  4. In `backend/agent/orchestrator.py`, added explicit detection of OS-level sandbox failures (`BlockingIOError`, `OSError`, etc.) and internal runner crashes, logging the full traceback server-side and returning a clean user-facing error message: `"Verification is temporarily unavailable due to server load — please retry in a moment."`.
+- Verification: 58/58 backend tests passing (including new unit test `test_sandbox_os_level_failure_sanitized_to_client`). Frontend build succeeds.
+
+
 

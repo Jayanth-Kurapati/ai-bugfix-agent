@@ -73,12 +73,13 @@ A GenAI Developer Intern build-sprint MVP: an agentic bug-fixing tool. Input: a 
 
 ## Current status
 *(Update this line at the end of each session so the next session starts oriented.)*
-Phase complete (2026-09-07): Pre-submission hardening pass completed and verified with zero regressions:
-1. Rate limit + concurrency cap implemented on POST /api/analyze: stdlib sliding-window per-IP rate limiter (5 req/min, 429 response, memory-leak-free pruning) and global concurrency cap (max 2 concurrent analyses, 503 response).
-2. Sandbox network isolation assessed: documented as known limitation honestly in AGENTS.md and README.md (no root/CAP_NET_ADMIN in standard container).
-3. React ErrorBoundary implemented: class-based ErrorBoundary wrapping main workstation content in frontend/src/components/ErrorBoundary.jsx and App.jsx, verified via deliberate error throw and restored cleanly.
-4. Exception leakage eliminated: sanitized generic message ("An unexpected error occurred during analysis.") returned to client; full stack trace logged server-side via logger.exception.
-5. All 57 backend tests passing (54 passed, 3 skipped on Windows). Frontend build succeeds (706ms). Local E2E analysis run verified working end-to-end.
+Phase complete (2026-09-07): BlockingIOError fork failure eliminated & sandbox exception leakage prevented:
+1. Omitted RLIMIT_NPROC in backend/sandbox/runner.py: prevents suffocating the shared container UID process limit on Render while retaining memory and CPU limits.
+2. Guaranteed sandbox subprocess reaping: process.poll() check, killpg(SIGKILL), and process.wait() in a finally block in runner.py prevents defunct/zombie processes.
+3. Replaced inner subprocess fork in __verify__.py with in-process pytest.main(pytest_arguments) execution, eliminating the nested fork entirely.
+4. Added explicit catching of OS-level sandbox failures (BlockingIOError, OSError, etc.) in orchestrator.py: logs full traceback server-side and surfaces sanitized non-technical message ("Verification is temporarily unavailable due to server load — please retry in a moment.") with zero raw tracebacks reaching the UI.
+5. All 58 backend tests passing (55 passed, 3 skipped on Windows). Frontend build succeeds (982ms).
+
 
 
 

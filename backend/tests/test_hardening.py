@@ -158,3 +158,69 @@ def test_raw_exceptions_are_not_leaked_to_client(monkeypatch, caplog):
             )
 
 
+def test_sandbox_os_level_failure_sanitized_to_client(monkeypatch, caplog):
+    import logging
+    from backend.sandbox.runner import SandboxResult
+
+    req = AnalyzeRequest(
+        mode="snippet",
+        code="def add(a, b):\n    return a + b\n",
+        test_type="pytest",
+        test_content="def test_add():\n    from snippet import add\n    assert add(1, 2) == 3\n",
+    )
+
+    monkeypatch.setattr(
+        "backend.agent.orchestrator.diagnose",
+        lambda *args, **kwargs: type(
+            "Diag",
+            (),
+            {
+                "success": True,
+                "status": "diagnosed",
+                "model_id": "test",
+                "diagnosis": type("P", (), {"known": [], "unknown": [], "hypothesis": "hyp", "next_action": "act", "target_files": ["snippet.py"]})(),
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        "backend.agent.orchestrator.generate_patch",
+        lambda *args, **kwargs: type(
+            "Patch",
+            (),
+            {
+                "success": True,
+                "status": "diff_generated",
+                "model_id": "test",
+                "error": None,
+                "diff": "--- a/snippet.py\n+++ b/snippet.py\n@@ -1,2 +1,2 @@\n def add(a, b):\n-    return a + b\n+    return a + b\n",
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        "backend.agent.orchestrator.apply_unified_diff",
+        lambda orig, cand, diff: type("App", (), {"success": True, "status": "applied", "patched_files": ["snippet.py"], "workspace_path": cand, "error": None})(),
+    )
+
+    raw_traceback = (
+        "Traceback (most recent call last):\n"
+        "  File './workspace/__verify__.py', line 3, in <module>\n"
+        "    result = subprocess.run([sys.executable, '-m', 'pytest'], check=False)\n"
+        "BlockingIOError: [Errno 11] Resource temporarily unavailable"
+    )
+    monkeypatch.setattr(
+        "backend.agent.orchestrator._verify_candidate",
+        lambda *args, **kwargs: SandboxResult(False, 1, "", raw_traceback, False, "failed"),
+    )
+
+    client = MockLLMClient()
+    with caplog.at_level(logging.ERROR):
+        result = run_analysis(req, client)
+
+    assert result.status == "blocked"
+    assert result.error == "Verification is temporarily unavailable due to server load — please retry in a moment."
+    assert "BlockingIOError" not in (result.error or "")
+    assert "__verify__.py" not in (result.error or "")
+    assert any("BlockingIOError" in str(r.message) for r in caplog.records)
+
+
+

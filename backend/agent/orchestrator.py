@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass, field
+import logging
 from pathlib import Path
 import re
 import shlex
@@ -12,6 +13,8 @@ import subprocess
 import sys
 import tempfile
 from typing import Any, Callable
+
+logger = logging.getLogger(__name__)
 
 from backend.agent.diagnosis import DiagnosisContext, diagnose
 from backend.agent.judge import JudgeContext, judge_fix
@@ -200,9 +203,9 @@ def _verify_candidate(candidate: Path, request: AnalyzeRequest) -> SandboxResult
             return SandboxResult(False, None, "", "", False, "execution_error", "Unsupported test command; use permitted pytest arguments only.")
     wrapper = candidate / "__verify__.py"
     wrapper.write_text(
-        "import subprocess\nimport sys\n"
-        f"result = subprocess.run([sys.executable, '-m', 'pytest', *{pytest_arguments!r}], check=False)\n"
-        "raise SystemExit(result.returncode)\n",
+        "import pytest\nimport sys\n"
+        f"code = pytest.main({pytest_arguments!r})\n"
+        "raise SystemExit(int(code))\n",
         encoding="utf-8",
     )
     return run_python(candidate, "__verify__.py")
@@ -392,7 +395,43 @@ def run_analysis(
                 stderr=latest_verification.stderr,
             )
             if not latest_verification.success:
-                previous_failure = latest_verification.stderr or latest_verification.stdout or latest_verification.error or "Verification failed."
+                raw_err = (
+                    latest_verification.stderr
+                    or latest_verification.stdout
+                    or latest_verification.error
+                    or "Verification failed."
+                )
+
+                # Catch OS-level sandbox failures (BlockingIOError, OSError, fork failures)
+                # and internal wrapper crashes so raw tracebacks NEVER leak to the client
+                is_os_or_internal_crash = (
+                    any(marker in raw_err for marker in ("BlockingIOError", "Errno 11", "Resource temporarily unavailable", "OSError"))
+                    or ("Traceback (most recent call last):" in raw_err and "__verify__.py" in raw_err)
+                )
+
+                if is_os_or_internal_crash:
+                    logger.error("OS-level or internal runner failure during sandbox verification: %s", raw_err)
+                    clean_err = "Verification is temporarily unavailable due to server load — please retry in a moment."
+                    latest_verification = SandboxResult(
+                        success=False,
+                        exit_code=latest_verification.exit_code,
+                        stdout="",
+                        stderr="",
+                        timed_out=latest_verification.timed_out,
+                        status="blocked",
+                        error=clean_err,
+                    )
+                    return _final(
+                        "blocked",
+                        trace,
+                        client,
+                        diff=latest_diff,
+                        verification=latest_verification,
+                        error=clean_err,
+                        iteration_count=iteration,
+                    )
+
+                previous_failure = raw_err
                 previous_diff = patch.diff
                 previous_hypothesis = payload.hypothesis
                 if latest_verification.status == "unsupported_platform":

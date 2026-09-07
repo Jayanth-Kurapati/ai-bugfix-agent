@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 import os
 from pathlib import Path
 import shutil
@@ -11,6 +12,8 @@ import subprocess
 import sys
 import tempfile
 from typing import Sequence
+
+logger = logging.getLogger(__name__)
 
 try:  # `resource` is deliberately unavailable on Windows.
     import resource
@@ -61,12 +64,10 @@ def _set_resource_limits(limits: SandboxLimits) -> None:
     assert resource is not None
     resource.setrlimit(resource.RLIMIT_CPU, (limits.cpu_seconds, limits.cpu_seconds))
     resource.setrlimit(resource.RLIMIT_AS, (limits.memory_bytes, limits.memory_bytes))
-    if hasattr(resource, "RLIMIT_NPROC"):
-        try:
-            # Constrain process spawning (mitigate fork bombs)
-            resource.setrlimit(resource.RLIMIT_NPROC, (64, 64))
-        except (ValueError, OSError):
-            pass
+    # Note: RLIMIT_NPROC is intentionally omitted. In Linux, setrlimit(RLIMIT_NPROC)
+    # limits processes across the real UID of the entire container (e.g. Render's UID 1000),
+    # causing fork failures (EAGAIN/BlockingIOError) across the web service.
+
 
 
 def _as_text(value: str | bytes | None) -> str:
@@ -187,22 +188,38 @@ def run_python(
                 preexec_fn=lambda: _set_resource_limits(active_limits),
             )
             try:
-                raw_stdout, raw_stderr = process.communicate(timeout=active_limits.wall_timeout_seconds)
-            except subprocess.TimeoutExpired as exc:
                 try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except (OSError, ProcessLookupError):
-                    process.kill()
-                raw_stdout, raw_stderr = process.communicate()
-                return SandboxResult(
-                    success=False,
-                    exit_code=process.returncode,
-                    stdout=_sanitize_output(_as_text(raw_stdout) or _as_text(exc.output), copied_workspace),
-                    stderr=_sanitize_output(_as_text(raw_stderr) or _as_text(exc.stderr), copied_workspace),
-                    timed_out=True,
-                    status="timed_out",
-                    error="Wall-clock timeout exceeded.",
-                )
+                    raw_stdout, raw_stderr = process.communicate(timeout=active_limits.wall_timeout_seconds)
+                except subprocess.TimeoutExpired as exc:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except (OSError, ProcessLookupError):
+                        process.kill()
+                    try:
+                        process.wait(timeout=2.0)
+                    except (OSError, subprocess.TimeoutExpired):
+                        pass
+                    raw_stdout, raw_stderr = process.communicate()
+                    return SandboxResult(
+                        success=False,
+                        exit_code=process.returncode,
+                        stdout=_sanitize_output(_as_text(raw_stdout) or _as_text(exc.output), copied_workspace),
+                        stderr=_sanitize_output(_as_text(raw_stderr) or _as_text(exc.stderr), copied_workspace),
+                        timed_out=True,
+                        status="timed_out",
+                        error="Wall-clock timeout exceeded.",
+                    )
+            finally:
+                # Guarantee child process is always reaped and never left defunct/zombie
+                if process.poll() is None:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except (OSError, ProcessLookupError):
+                        process.kill()
+                    try:
+                        process.wait(timeout=1.0)
+                    except (OSError, subprocess.TimeoutExpired):
+                        pass
 
             stdout = _sanitize_output(raw_stdout, copied_workspace)
             stderr = _sanitize_output(raw_stderr, copied_workspace)
@@ -215,4 +232,5 @@ def run_python(
                 status="passed" if process.returncode == 0 else "failed",
             )
     except (OSError, shutil.Error) as exc:
-        return SandboxResult(False, None, "", "", False, "execution_error", "Execution failed due to an OS-level error.")
+        logger.exception("Sandbox OS execution error: %s", exc)
+        return SandboxResult(False, None, "", "", False, "execution_error", "Verification is temporarily unavailable due to server load — please retry in a moment.")
