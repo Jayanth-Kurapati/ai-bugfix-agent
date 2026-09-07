@@ -181,22 +181,24 @@ GET  /health          → { status: "ok" }
 > These are stated honestly per the project's design documents. None are hidden or softened.
 
 1. **Sandbox is process-level isolation only** — timeout + resource limits via `resource.setrlimit`, **not** a container or VM sandbox. This provides basic resource control but not full security isolation. Do not run untrusted code in production without understanding this limitation.
+ 
+2. **No sandbox network isolation** — the sandbox provides CPU/memory/process isolation via `resource.setrlimit`, but not network isolation; executed code could still make outbound network requests within the short execution timeout. True network namespacing or iptables packet filtering requires elevated container privileges (`CAP_NET_ADMIN`) not available in standard unprivileged deployment environments.
 
-2. **Python only** — no other programming languages are supported in this MVP.
+3. **Python only** — no other programming languages are supported in this MVP.
 
-3. **No authentication** — the API is unauthenticated. Anyone with the URL can submit jobs.
+4. **No authentication** — the API is unauthenticated. Anyone with the URL can submit jobs.
 
-4. **No persistent storage** — jobs are stored in an in-memory dictionary keyed by UUID. All data is lost when the process restarts. This is acceptable for a single-instance, ephemeral demo.
+5. **No persistent storage** — jobs are stored in an in-memory dictionary keyed by UUID. All data is lost when the process restarts. This is acceptable for a single-instance, ephemeral demo.
 
-5. **No GitHub PR/webhook integration** — the tool does not create pull requests, post comments, or respond to webhooks. This is a stretch goal, not part of the MVP.
+6. **No GitHub PR/webhook integration** — the tool does not create pull requests, post comments, or respond to webhooks. This is a stretch goal, not part of the MVP.
 
-6. **No dependency installation** — cloned repositories do not have their dependencies installed automatically. Tests that require third-party packages will fail.
+7. **No dependency installation** — cloned repositories do not have their dependencies installed automatically. Tests that require third-party packages will fail.
 
-7. **Windows unsupported for sandbox execution** — on Windows, submitted code is never executed. Jobs return a clear unsupported-platform result. The sandbox requires Linux/POSIX for `resource.setrlimit`.
+8. **Windows unsupported for sandbox execution** — on Windows, submitted code is never executed. Jobs return a clear unsupported-platform result. The sandbox requires Linux/POSIX for `resource.setrlimit`.
 
-8. **Free-tier LLM limitations** — free models rotate on OpenRouter without notice. If no eligible free model is available at startup, jobs return a `model_unavailable` error rather than falling back to paid models.
+9. **Free-tier LLM limitations** — free models rotate on OpenRouter without notice. If no eligible free model is available at startup, jobs return a `model_unavailable` error rather than falling back to paid models.
 
-9. **Single-instance, single-process** — no horizontal scaling, no worker queue, no background job persistence across restarts.
+10. **Single-instance, single-process** — no horizontal scaling, no worker queue, no background job persistence across restarts.
 
 ---
 

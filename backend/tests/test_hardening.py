@@ -111,3 +111,50 @@ def test_traceback_mode_inconclusive_when_not_reproduced(monkeypatch):
     assert result.status == "verification_inconclusive"
     assert "could not be deterministically reproduced" in (result.error or "")
 
+
+def test_raw_exceptions_are_not_leaked_to_client(monkeypatch, caplog):
+    import logging
+    import time
+    from fastapi.testclient import TestClient
+    from backend.api import routes
+    from backend.main import app
+
+    def crash_analysis(*args, **kwargs):
+        raise RuntimeError("CRITICAL_INTERNAL_SECRET_XYZ: Connection failed at 10.0.0.99")
+
+    monkeypatch.setattr(routes, "run_analysis", crash_analysis)
+
+    with caplog.at_level(logging.ERROR):
+        with TestClient(app) as client:
+            resp = client.post(
+                "/api/analyze",
+                json={
+                    "mode": "snippet",
+                    "code": "def add(a, b): return a + b\n",
+                    "test_type": "pytest",
+                    "test_content": "def test_add(): assert True\n",
+                },
+            )
+            assert resp.status_code == 201
+            job_id = resp.json()["job_id"]
+
+            for _ in range(20):
+                job_resp = client.get(f"/api/jobs/{job_id}")
+                if job_resp.json()["status"] == "failed":
+                    break
+                time.sleep(0.05)
+
+            job = job_resp.json()
+            assert job["status"] == "failed"
+            # Client sees sanitized generic message
+            assert job["error"] == "An unexpected error occurred during analysis."
+            assert "CRITICAL_INTERNAL_SECRET_XYZ" not in (job["error"] or "")
+            assert "10.0.0.99" not in (job["error"] or "")
+
+            # Server log captures the real exception
+            assert any(
+                "CRITICAL_INTERNAL_SECRET_XYZ" in str(r.message) or (r.exc_info and "CRITICAL_INTERNAL_SECRET_XYZ" in str(r.exc_info))
+                for r in caplog.records
+            )
+
+

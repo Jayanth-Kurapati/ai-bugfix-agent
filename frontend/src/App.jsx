@@ -13,6 +13,7 @@ import InputForm from './components/InputForm';
 import TraceView from './components/TraceView';
 import DiffView from './components/DiffView';
 import StatusBar from './components/StatusBar';
+import ErrorBoundary from './components/ErrorBoundary';
 import logoMark from './assets/logo-mark.svg';
 import './App.css';
 
@@ -116,212 +117,214 @@ export default function App() {
 
       {/* Main Workstation Body */}
       <main className="app-main">
-        {/* Input Form — Always visible when idle, submitting, or when submission error occurs */}
-        {(phase === 'idle' || phase === 'submitting') && (
-          <section className="section-center" aria-label="Bug submission input">
-            <InputForm
-              onSubmit={handleSubmit}
-              disabled={isActive}
-              isSubmitting={phase === 'submitting'}
-              submitError={submitError}
-              onClearError={clearSubmitError}
-            />
-          </section>
-        )}
+        <ErrorBoundary onReset={reset}>
+          {/* Input Form — Always visible when idle, submitting, or when submission error occurs */}
+          {(phase === 'idle' || phase === 'submitting') && (
+            <section className="section-center" aria-label="Bug submission input">
+              <InputForm
+                onSubmit={handleSubmit}
+                disabled={isActive}
+                isSubmitting={phase === 'submitting'}
+                submitError={submitError}
+                onClearError={clearSubmitError}
+              />
+            </section>
+          )}
 
-        {/* Live Execution Telemetry Bar */}
-        {(isActive || isDone) && (
-          <section className="section-fullwidth" aria-label="Agent execution status">
-            <StatusBar
-              status={status}
-              events={events}
-              iterationCount={iterationCount}
-              llmCallCount={isDone && finalJob ? finalJob.llm_call_count : llmCallCount}
-              error={error}
-              onRetry={handleRetry}
-            />
-          </section>
-        )}
+          {/* Live Execution Telemetry Bar */}
+          {(isActive || isDone) && (
+            <section className="section-fullwidth" aria-label="Agent execution status">
+              <StatusBar
+                status={status}
+                events={events}
+                iterationCount={iterationCount}
+                llmCallCount={isDone && finalJob ? finalJob.llm_call_count : llmCallCount}
+                error={error}
+                onRetry={handleRetry}
+              />
+            </section>
+          )}
 
-        {/* Workstation Results Area */}
-        {(phase === 'streaming' || isDone) && (
-          <div className="results-grid">
-            {/* 1. Primary Final Verdict Card (dominant result state) */}
-            {isDone && finalJob && (
-              <section className="verdict-banner-card surface-card animate-fade-in" id="summary-card" aria-label="Final verification result">
-                <div className="verdict-header">
-                  <div className="verdict-title-group">
-                    {status === 'verified' && (
-                      <>
-                        <div className="verdict-icon-box status-verified-box" aria-hidden="true">
-                          <CheckCircle2 size={22} className="color-success" />
-                        </div>
-                        <div>
-                          <h2 className="verdict-title">Bug Fixed & Verified</h2>
-                          <p className="verdict-subtitle">
-                            The candidate patch successfully passed sandboxed test execution and the judge confirmed the fix.
-                          </p>
-                        </div>
-                      </>
-                    )}
-                    {status === 'blocked' && (
-                      <>
-                        <div className="verdict-icon-box status-blocked-box" aria-hidden="true">
-                          <AlertTriangle size={22} className="color-warning" />
-                        </div>
-                        <div>
-                          <h2 className="verdict-title">Verification Blocked by Host Sandbox</h2>
-                          <p className="verdict-subtitle">
-                            A patch was generated, but test execution is blocked on this host environment. The patch is unverified.
-                          </p>
-                        </div>
-                      </>
-                    )}
-                    {status === 'failed' && (
-                      <>
-                        <div className="verdict-icon-box status-failed-box" aria-hidden="true">
-                          <XCircle size={22} className="color-error" />
-                        </div>
-                        <div>
-                          <h2 className="verdict-title">Verification Failed</h2>
-                          <p className="verdict-subtitle">
-                            The candidate patch failed sandboxed test execution or judge verification.
-                          </p>
-                        </div>
-                      </>
-                    )}
-                    {status === 'model_unavailable' && (
-                      <>
-                        <div className="verdict-icon-box status-failed-box" aria-hidden="true">
-                          <Unplug size={22} className="color-error" />
-                        </div>
-                        <div>
-                          <h2 className="verdict-title">Model Service Unavailable</h2>
-                          <p className="verdict-subtitle">
-                            Free-tier LLM models are currently rate-limited or in rotation on OpenRouter. Please retry in a moment.
-                          </p>
-                        </div>
-                      </>
-                    )}
-                    {status === 'verification_inconclusive' && (
-                      <>
-                        <div className="verdict-icon-box status-blocked-box" aria-hidden="true">
-                          <AlertTriangle size={22} className="color-warning" />
-                        </div>
-                        <div>
-                          <h2 className="verdict-title">Verification Inconclusive</h2>
-                          <p className="verdict-subtitle">
-                            The reported failure could not be deterministically reproduced in the verification environment.
-                          </p>
-                        </div>
-                      </>
-                    )}
-                    {status === 'repository_error' && (
-                      <>
-                        <div className="verdict-icon-box status-failed-box" aria-hidden="true">
-                          <XCircle size={22} className="color-error" />
-                        </div>
-                        <div>
-                          <h2 className="verdict-title">Repository Error</h2>
-                          <p className="verdict-subtitle">
-                            The repository could not be cloned or processed. Please verify repository URL and visibility.
-                          </p>
-                        </div>
-                      </>
-                    )}
-                    {status === 'invalid_input' && (
-                      <>
-                        <div className="verdict-icon-box status-failed-box" aria-hidden="true">
-                          <XCircle size={22} className="color-error" />
-                        </div>
-                        <div>
-                          <h2 className="verdict-title">Invalid Input Syntax</h2>
-                          <p className="verdict-subtitle">
-                            This MVP supports Python only by design. No valid Python code was found in the input.
-                          </p>
-                        </div>
-                      </>
-                    )}
+          {/* Workstation Results Area */}
+          {(phase === 'streaming' || isDone) && (
+            <div className="results-grid">
+              {/* 1. Primary Final Verdict Card (dominant result state) */}
+              {isDone && finalJob && (
+                <section className="verdict-banner-card surface-card animate-fade-in" id="summary-card" aria-label="Final verification result">
+                  <div className="verdict-header">
+                    <div className="verdict-title-group">
+                      {status === 'verified' && (
+                        <>
+                          <div className="verdict-icon-box status-verified-box" aria-hidden="true">
+                            <CheckCircle2 size={22} className="color-success" />
+                          </div>
+                          <div>
+                            <h2 className="verdict-title">Bug Fixed & Verified</h2>
+                            <p className="verdict-subtitle">
+                              The candidate patch successfully passed sandboxed test execution and the judge confirmed the fix.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                      {status === 'blocked' && (
+                        <>
+                          <div className="verdict-icon-box status-blocked-box" aria-hidden="true">
+                            <AlertTriangle size={22} className="color-warning" />
+                          </div>
+                          <div>
+                            <h2 className="verdict-title">Verification Blocked by Host Sandbox</h2>
+                            <p className="verdict-subtitle">
+                              A patch was generated, but test execution is blocked on this host environment. The patch is unverified.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                      {status === 'failed' && (
+                        <>
+                          <div className="verdict-icon-box status-failed-box" aria-hidden="true">
+                            <XCircle size={22} className="color-error" />
+                          </div>
+                          <div>
+                            <h2 className="verdict-title">Verification Failed</h2>
+                            <p className="verdict-subtitle">
+                              The candidate patch failed sandboxed test execution or judge verification.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                      {status === 'model_unavailable' && (
+                        <>
+                          <div className="verdict-icon-box status-failed-box" aria-hidden="true">
+                            <Unplug size={22} className="color-error" />
+                          </div>
+                          <div>
+                            <h2 className="verdict-title">Model Service Unavailable</h2>
+                            <p className="verdict-subtitle">
+                              Free-tier LLM models are currently rate-limited or in rotation on OpenRouter. Please retry in a moment.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                      {status === 'verification_inconclusive' && (
+                        <>
+                          <div className="verdict-icon-box status-blocked-box" aria-hidden="true">
+                            <AlertTriangle size={22} className="color-warning" />
+                          </div>
+                          <div>
+                            <h2 className="verdict-title">Verification Inconclusive</h2>
+                            <p className="verdict-subtitle">
+                              The reported failure could not be deterministically reproduced in the verification environment.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                      {status === 'repository_error' && (
+                        <>
+                          <div className="verdict-icon-box status-failed-box" aria-hidden="true">
+                            <XCircle size={22} className="color-error" />
+                          </div>
+                          <div>
+                            <h2 className="verdict-title">Repository Error</h2>
+                            <p className="verdict-subtitle">
+                              The repository could not be cloned or processed. Please verify repository URL and visibility.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                      {status === 'invalid_input' && (
+                        <>
+                          <div className="verdict-icon-box status-failed-box" aria-hidden="true">
+                            <XCircle size={22} className="color-error" />
+                          </div>
+                          <div>
+                            <h2 className="verdict-title">Invalid Input Syntax</h2>
+                            <p className="verdict-subtitle">
+                              This MVP supports Python only by design. No valid Python code was found in the input.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <span className={`status-pill status-pill-${status}`}>{status}</span>
                   </div>
-                  <span className={`status-pill status-pill-${status}`}>{status}</span>
-                </div>
 
-                {/* What Changed — Key Metrics */}
-                <div className="verdict-metrics">
-                  <div className="verdict-stat">
-                    <span className="stat-meta-label">Iterations</span>
-                    <span className="stat-meta-value">{finalJob.iteration_count || iterationCount} / 3</span>
-                  </div>
-                  <div className="verdict-stat">
-                    <span className="stat-meta-label">Model Calls</span>
-                    <span className="stat-meta-value">{finalJob.llm_call_count}</span>
-                  </div>
-                  {finalJob.judge_verdict !== null && finalJob.judge_verdict !== undefined && (
+                  {/* What Changed — Key Metrics */}
+                  <div className="verdict-metrics">
                     <div className="verdict-stat">
-                      <span className="stat-meta-label">Judge Verdict</span>
-                      <span className={`stat-meta-value ${finalJob.judge_verdict ? 'color-success' : 'color-failed'}`}>
-                        {finalJob.judge_verdict ? 'Genuine Fix Confirmed' : 'Rejected Gaming / Weakened Test'}
-                      </span>
+                      <span className="stat-meta-label">Iterations</span>
+                      <span className="stat-meta-value">{finalJob.iteration_count || iterationCount} / 3</span>
+                    </div>
+                    <div className="verdict-stat">
+                      <span className="stat-meta-label">Model Calls</span>
+                      <span className="stat-meta-value">{finalJob.llm_call_count}</span>
+                    </div>
+                    {finalJob.judge_verdict !== null && finalJob.judge_verdict !== undefined && (
+                      <div className="verdict-stat">
+                        <span className="stat-meta-label">Judge Verdict</span>
+                        <span className={`stat-meta-value ${finalJob.judge_verdict ? 'color-success' : 'color-failed'}`}>
+                          {finalJob.judge_verdict ? 'Genuine Fix Confirmed' : 'Rejected Gaming / Weakened Test'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Why Did It Work — Root Cause Explanation */}
+                  {rootCause && (
+                    <div className="verdict-root-cause">
+                      <span className="root-cause-label">Diagnosed Root Cause</span>
+                      <p className="root-cause-text">{rootCause}</p>
                     </div>
                   )}
-                </div>
 
-                {/* Why Did It Work — Root Cause Explanation */}
-                {rootCause && (
-                  <div className="verdict-root-cause">
-                    <span className="root-cause-label">Diagnosed Root Cause</span>
-                    <p className="root-cause-text">{rootCause}</p>
-                  </div>
-                )}
+                  {/* Judge Reasoning */}
+                  {finalJob.judge_reasoning && (
+                    <div className="verdict-reasoning-box">
+                      <span className="root-cause-label">Judge Evaluation</span>
+                      <p className="reasoning-text">{finalJob.judge_reasoning}</p>
+                    </div>
+                  )}
 
-                {/* Judge Reasoning */}
-                {finalJob.judge_reasoning && (
-                  <div className="verdict-reasoning-box">
-                    <span className="root-cause-label">Judge Evaluation</span>
-                    <p className="reasoning-text">{finalJob.judge_reasoning}</p>
-                  </div>
-                )}
+                  {/* Execution Note */}
+                  {finalJob.error && (
+                    <div className="verdict-error-box">
+                      <span className="root-cause-label">Execution Note</span>
+                      <p className="error-note-text">{finalJob.error}</p>
+                    </div>
+                  )}
 
-                {/* Execution Note */}
-                {finalJob.error && (
-                  <div className="verdict-error-box">
-                    <span className="root-cause-label">Execution Note</span>
-                    <p className="error-note-text">{finalJob.error}</p>
-                  </div>
-                )}
-
-                {/* Terminal Actions */}
-                <div className="verdict-actions">
-                  {status !== 'verified' && (
+                  {/* Terminal Actions */}
+                  <div className="verdict-actions">
+                    {status !== 'verified' && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleRetry}
+                        title="Re-run analysis with the same input"
+                      >
+                        <RefreshCw size={13} />
+                        <span>Retry Analysis</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm"
-                      onClick={handleRetry}
-                      title="Re-run analysis with the same input"
+                      onClick={reset}
                     >
-                      <RefreshCw size={13} />
-                      <span>Retry Analysis</span>
+                      <RotateCcw size={13} />
+                      <span>New Analysis</span>
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={reset}
-                  >
-                    <RotateCcw size={13} />
-                    <span>New Analysis</span>
-                  </button>
-                </div>
-              </section>
-            )}
+                  </div>
+                </section>
+              )}
 
-            {/* 2. Reasoning Trace (left column) */}
-            <TraceView events={events} />
+              {/* 2. Reasoning Trace (left column) */}
+              <TraceView events={events} />
 
-            {/* 3. Generated Patch DiffView (right column) */}
-            {diff && <DiffView diff={diff} status={status} />}
-          </div>
-        )}
+              {/* 3. Generated Patch DiffView (right column) */}
+              {diff && <DiffView diff={diff} status={status} />}
+            </div>
+          )}
+        </ErrorBoundary>
       </main>
 
       {/* Developer Tool Footer */}

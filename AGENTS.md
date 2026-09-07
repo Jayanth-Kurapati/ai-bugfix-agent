@@ -66,18 +66,19 @@ A GenAI Developer Intern build-sprint MVP: an agentic bug-fixing tool. Input: a 
 
 ## Known MVP limitations — state these honestly in the README, never overclaim
 - Sandbox is process-level isolation (timeout + resource limits), not a full container/VM sandbox.
+- Sandbox provides CPU/memory/process isolation via `resource.setrlimit`, but not network isolation; executed code could still make outbound network requests within the short execution timeout.
 - Python only, no other languages in the MVP.
 - No auth, no persistent storage beyond process lifetime.
 - No real GitHub PR/webhook posting integration (stretch goal only — see BUILD_PLAN.md).
 
 ## Current status
 *(Update this line at the end of each session so the next session starts oriented.)*
-Phase complete (2026-09-07): Production hardening pass fully implemented, tested, and deployed to https://ai-bugfix-agent.onrender.com. Hardening controls verified:
-1. Sandbox secret redaction & path normalization (API keys & host directories never leak).
-2. Patch integrity verification (prevents test suite weakening, assertion deletion, and runner hijacking).
-3. Traceback pre-verification reproduction check (honest 'verification_inconclusive' status when not reproduced).
-4. Authoritative server-side iteration tracking and SSE fallback cleanup race condition resolved.
-5. Frontend UX telemetry overhauled: removed non-enforced fake budget meter, added UNVERIFIED PATCH distinction banners, and supported all terminal statuses ('verification_inconclusive', 'repository_error', 'invalid_input').
-6. 52/52 backend tests passing (including new test_hardening.py suite). Pushed to origin/main. Live health check 200 OK.
+Phase complete (2026-09-07): Pre-submission hardening pass completed and verified with zero regressions:
+1. Rate limit + concurrency cap implemented on POST /api/analyze: stdlib sliding-window per-IP rate limiter (5 req/min, 429 response, memory-leak-free pruning) and global concurrency cap (max 2 concurrent analyses, 503 response).
+2. Sandbox network isolation assessed: documented as known limitation honestly in AGENTS.md and README.md (no root/CAP_NET_ADMIN in standard container).
+3. React ErrorBoundary implemented: class-based ErrorBoundary wrapping main workstation content in frontend/src/components/ErrorBoundary.jsx and App.jsx, verified via deliberate error throw and restored cleanly.
+4. Exception leakage eliminated: sanitized generic message ("An unexpected error occurred during analysis.") returned to client; full stack trace logged server-side via logger.exception.
+5. All 57 backend tests passing (54 passed, 3 skipped on Windows). Frontend build succeeds (706ms). Local E2E analysis run verified working end-to-end.
+
 
 
